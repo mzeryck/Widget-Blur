@@ -23,6 +23,7 @@ if (!phone) {
 // Extra setup needed for 2436-sized phones.
 if (height == 2436) {
 
+  let files = FileManager.local()
   let cacheName = "mz-phone-type"
   let cachePath = files.joinPath(files.libraryDirectory(), cacheName)
 
