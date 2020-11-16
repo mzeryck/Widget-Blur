@@ -1,3 +1,7 @@
+// Variables used by Scriptable.
+// These must be at the very top of the file. Do not edit.
+// icon-color: yellow; icon-glyph: magic;
+
 // This script was created by Max Zeryck.
 
 // The amount of blurring. Default is 150.
@@ -6,9 +10,35 @@ let blur = 150
 // Determine if user has taken the screenshot.
 var message
 message = "Before you start, go to your home screen and enter wiggle mode. Scroll to the empty page on the far right and take a screenshot."
-let exitOptions = ["Continue to Select Image","Exit to Take Screenshot"]
-let shouldExit = await generateAlert(message,exitOptions)
-if (shouldExit) return
+let options = ["Continue to select image","Exit to take screenshot","Update code"]
+let response = await generateAlert(message,options)
+
+// Return if we need to exit.
+if (response == 1) return
+
+// Update the code.
+if (response == 2) {
+
+  // Determine if the user is using iCloud.
+  let files = FileManager.local()
+  const iCloudInUse = files.isFileStoredIniCloud(module.filename)
+
+  // If so, use an iCloud file manager.
+  files = iCloudInUse ? FileManager.iCloud() : files
+
+  // Try to download the file.
+  try {
+    const req = new Request("https://raw.githubusercontent.com/mzeryck/Widget-Blur/main/widget-blur.js")
+    const codeString = await req.loadString()
+    files.writeString(module.filename, codeString)
+    message = "The code has been updated. If the script is open, close it for the change to take effect."
+  } catch {
+    message = "The update failed. Please try again later."
+  }
+  options = ["OK"]
+  await generateAlert(message,options)
+  return
+}
   
 // Get screenshot and determine phone size.
 let img = await Photos.fromLibrary()
@@ -89,15 +119,16 @@ if (widgetSize == "Small") {
 
 // Prompt for blur style.
 message = "Do you want a fully transparent widget, or a translucent blur effect?"
-let blurOptions = ["Transparent","Light blur","Dark blur"]
+let blurOptions = ["Transparent","Light blur","Dark blur","Just blur"]
 let blurred = await generateAlert(message,blurOptions)
 
 // We always need the cropped image.
 let imgCrop = cropImage(img)
 
-// If it's blurred, apply blurring before cropping.
+// If it's blurred, set the blur style.
 if (blurred) {
-  const style = (blurred == 1) ? "light" : "dark"
+  const styles = ["", "light", "dark", "none"]
+  const style = styles[blurred]
   imgCrop = await blurImage(img,imgCrop,style)
 }
 
@@ -552,16 +583,19 @@ async function blurImage(img,imgCrop,style) {
   var imageData = context.getImageData(0,0,w,h);
   var pix = imageData.data;
   
-  var isDark = "${style}" == "dark";
-  var imageFunc = isDark ? darkBlur : lightBlur;
+  // Set the image function, if any.
+  var imageFunc;
+  var style = "${style}";
+  if (style == "dark") { imageFunc = darkBlur; }
+  else if (style == "light") { imageFunc = lightBlur; }
 
   for (let i=0; i < pix.length; i+=4) {
 
     // Convert to HSL.
     let hsl = rgbToHsl(pix[i],pix[i+1],pix[i+2]);
     
-    // Apply the image function.
-    hsl = imageFunc(hsl);
+    // Apply the image function if it exists.
+    if (imageFunc) { hsl = imageFunc(hsl); }
   
     // Convert back to RGB.
     const rgb = hslToRgb(hsl[0], hsl[1], hsl[2]);
@@ -580,7 +614,7 @@ async function blurImage(img,imgCrop,style) {
   stackBlurCanvasRGB("mainCanvas", 0, 0, w, h, ${blur});
   
   // Perform the additional processing for dark images.
-  if (isDark) {
+  if (style == "dark") {
   
     // Draw the hard light box over it.
     context.globalCompositeOperation = "hard-light";
@@ -598,7 +632,7 @@ async function blurImage(img,imgCrop,style) {
     context.fillRect(0, 0, w, h);
   
   // Otherwise process light images.
-  } else {
+  } else if (style == "light") {
     context.fillStyle = "rgba(255,255,255,0.4)";
     context.fillRect(0, 0, w, h);
   }
