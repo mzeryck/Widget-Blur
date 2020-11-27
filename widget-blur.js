@@ -707,11 +707,11 @@ function phoneSizes() {
       small:  338,
       medium: 720,
       large:  758,
-      left:  54,
-      right: 436,
-      top:    160,
-      middle: 580,
-      bottom: 1000
+      left:  55,
+      right: 437,
+      top:    159,
+      middle: 579,
+      bottom: 999
     },
     
     
