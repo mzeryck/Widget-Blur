@@ -665,8 +665,32 @@ async function blurImage(img,imgCrop,style) {
 // Pixel sizes and positions for widgets on all supported phones.
 function phoneSizes() {
   let phones = {  
+  
+    // 14 Pro Max
+    "2796": {
+      small: 510,
+      medium: 1092,
+      large: 1146,
+      left: 99,
+      right: 681,
+      top: 282,
+      middle: 918,
+      bottom: 1554
+    }
+
+    // 14 Pro
+    "2556": {
+      small: 474,
+      medium: 1014,
+      large: 1062,
+      left: 82,
+      right: 622,
+      top: 270,
+      middle: 858,
+      bottom: 1446
+    },
    
-    // 12 Pro Max
+    // 13 Pro Max, 12 Pro Max
     "2778": {
       small:  510,
       medium: 1092,
@@ -678,7 +702,7 @@ function phoneSizes() {
       bottom: 1518
     },
   
-    // 12 and 12 Pro
+    // 13, 13 Pro, 12, 12 Pro
     "2532": {
       small:  474,
       medium: 1014,
@@ -715,7 +739,7 @@ function phoneSizes() {
     },
     
     
-    // 11 Pro, XS, X, 12 mini
+    // 13 mini, 12 mini / 11 Pro, XS, X
     "2436": {
      
       x: {
