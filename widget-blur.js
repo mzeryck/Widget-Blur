@@ -676,7 +676,7 @@ function phoneSizes() {
       top: 282,
       middle: 918,
       bottom: 1554
-    }
+    },
 
     // 14 Pro
     "2556": {
