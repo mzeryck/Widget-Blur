@@ -5,25 +5,20 @@
 // This script was created by Max Zeryck.
 
 // The amount of blurring. Default is 150.
-let blur = 150
+const blurRadius = 150
  
 // Determine if user has taken the screenshot.
-var message
-message = "Before you start, go to your home screen and enter wiggle mode. Scroll to the empty page on the far right and take a screenshot."
-let options = ["Continue to select image","Exit to take screenshot","Update code"]
-let response = await generateAlert(message,options)
+let message = "Before you start, go to your home screen and enter wiggle mode. Scroll to the empty page on the far right and take a screenshot."
+const actions = {select: "Continue to select image",exit: "Exit to take screenshot",update: "Update code"}
+const actionOptions = [actions.select, actions.exit, actions.update]
+const actionResponse = await generateAlert(message,actionOptions)
 
-// Return if we need to exit.
-if (response == 1) return
-
-// Update the code.
-if (response == 2) {
+if (actionResponse.value == actions.exit) return
+if (actionResponse.value == actions.update) {
 
   // Determine if the user is using iCloud.
   let files = FileManager.local()
   const iCloudInUse = files.isFileStoredIniCloud(module.filename)
-
-  // If so, use an iCloud file manager.
   files = iCloudInUse ? FileManager.iCloud() : files
 
   // Try to download the file.
@@ -35,111 +30,99 @@ if (response == 2) {
   } catch {
     message = "The update failed. Please try again later."
   }
-  options = ["OK"]
-  await generateAlert(message,options)
-  return
+  return await generateAlert(message,["OK"])
 }
   
 // Get screenshot and determine phone size.
 let img = await Photos.fromLibrary()
-let height = img.size.height
-let phone = phoneSizes()[height]
+const height = img.size.height
+let phone = phoneSizes(height)
 if (!phone) {
   message = "It looks like you selected an image that isn't an iPhone screenshot, or your iPhone is not supported. Try again with a different image."
-  await generateAlert(message,["OK"])
-  return
+  return await generateAlert(message,["OK"])
 }
 
 // Extra setup needed for 2436-sized phones.
 if (height == 2436) {
 
-  let files = FileManager.local()
-  let cacheName = "mz-phone-type"
-  let cachePath = files.joinPath(files.libraryDirectory(), cacheName)
+  const files = FileManager.local()
+  const cachePath = files.joinPath(files.libraryDirectory(), "mz-phone-type")
 
   // If we already cached the phone size, load it.
   if (files.fileExists(cachePath)) {
-    let typeString = files.readString(cachePath)
-    phone = phone[typeString]
+    const type = files.readString(cachePath)
+    phone = phone[type]
   
   // Otherwise, prompt the user.
   } else { 
     message = "What type of iPhone do you have?"
-    let types = ["iPhone 12 mini", "iPhone 11 Pro, XS, or X"]
-    let typeIndex = await generateAlert(message, types)
-    let type = (typeIndex == 0) ? "mini" : "x"
-    phone = phone[type]
-    files.writeString(cachePath, type)
+      const typeOptions = [{key: "mini", value: "iPhone 13 mini or 12 mini"}, {key: "x", value: "iPhone 11 Pro, XS, or X"}]
+      const typeResponse = await generateAlert(message, typeOptions)
+      phone = phone[typeResponse.key]
+      files.writeString(cachePath, typeResponse.key)
   }
 }
 
-// Prompt for widget size and position.
-message = "What size of widget are you creating?"
-let sizes = ["Small","Medium","Large"]
-let size = await generateAlert(message,sizes)
-let widgetSize = sizes[size]
+// If supported, check whether home screen has text labels or not.
+if (phone.text) {
+  message = "What size are your home screen icons?"
+  const textOptions = [{key: "text", value: "Small (has labels)"},{key: "notext", value: "Large (no labels)"}]
+  const textResponse = await generateAlert(message, textOptions)
+  phone = phone[textResponse.key]
+}
 
+// Prompt for widget size.
+message = "What size of widget are you creating?"
+const sizes = {small: "Small", medium: "Medium", large: "Large"}
+const sizeOptions = [sizes.small, sizes.medium, sizes.large]
+const size = (await generateAlert(message,sizeOptions)).value
+
+// Prompt for position.
 message = "What position will it be in?"
 message += (height == 1136 ? " (Note that your device only supports two rows of widgets, so the middle and bottom options are the same.)" : "")
 
-// Determine image crop based on phone size.
-let crop = { w: "", h: "", x: "", y: "" }
-if (widgetSize == "Small") {
-  crop.w = phone.small
-  crop.h = phone.small
-  let positions = ["Top left","Top right","Middle left","Middle right","Bottom left","Bottom right"]
-  let position = await generateAlert(message,positions)
-  
-  // Convert the two words into two keys for the phone size dictionary.
-  let keys = positions[position].toLowerCase().split(' ')
-  crop.y = phone[keys[0]]
-  crop.x = phone[keys[1]]
-  
-} else if (widgetSize == "Medium") {
-  crop.w = phone.medium
-  crop.h = phone.small
-  
-  // Medium and large widgets have a fixed x-value.
-  crop.x = phone.left
-  let positions = ["Top","Middle","Bottom"]
-  let position = await generateAlert(message,positions)
-  let key = positions[position].toLowerCase()
-  crop.y = phone[key]
-  
-} else if(widgetSize == "Large") {
-  crop.w = phone.medium
-  crop.h = phone.large
-  crop.x = phone.left
-  let positions = ["Top","Bottom"]
-  let position = await generateAlert(message,positions)
-  
-  // Large widgets at the bottom have the "middle" y-value.
-  crop.y = position ? phone.middle : phone.top
+let positions
+if (size == sizes.small) {
+  positions = ["Top left","Top right","Middle left","Middle right","Bottom left","Bottom right"]
+} else if (size == sizes.medium) {
+  positions = ["Top","Middle","Bottom"]
+} else if (size == sizes.large) {
+  positions = [{key: "top", value: "Top"},{key: "middle", value: "Bottom"}]
+}
+const position = (await generateAlert(message,positions)).key
+
+// Determine image crop based on the size and position.
+const crop = { 
+  w: (size == sizes.small ? phone.small : phone.medium),
+  h: (size == sizes.large ? phone.large : phone.small),
+  x: (size == sizes.small ? phone[position.split(" ")[1]] : phone.left),
+  y: phone[position.toLowerCase().split(" ")[0]]
 }
 
-// Prompt for blur style.
+// Prompt for blur style and blur the image.
 message = "Do you want a fully transparent widget, or a translucent blur effect?"
-let blurOptions = ["Transparent","Light blur","Dark blur","Just blur"]
-let blurred = await generateAlert(message,blurOptions)
+const blurs = {none: "Transparent (no blur)",light: "Light mode blur",dark: "Dark mode blur",blur: "Just blur"}
+const blurOptions = [blurs.none, blurs.light, blurs.dark, blurs.blur]
+const blurResponse = await generateAlert(message,blurOptions)
 
-// We always need the cropped image.
-let imgCrop = cropImage(img)
+if (blurResponse.value != blurs.none) img = await blurImage(img,blurResponse.key)
 
-// If it's blurred, set the blur style.
-if (blurred) {
-  const styles = ["", "light", "dark", "none"]
-  const style = styles[blurred]
-  imgCrop = await blurImage(img,imgCrop,style)
-}
+// Crop the image.
+const draw = new DrawContext()
+draw.size = new Size(crop.w, crop.h)
+draw.drawImageAtPoint(img,new Point(-crop.x, -crop.y))  
+img = draw.getImage()
 
+// Finalize and export the image.
 message = "Your widget background is ready. Choose where to save the image:"
-const exportPhotoOptions = ["Export to the Photos app","Export to the Files app"]
-const exportToFiles = await generateAlert(message,exportPhotoOptions)
+const exports = {photos: "Export to Photos", files: "Export to Files"}
+const exportOptions = [exports.photos, exports.files]
+const exportValue = (await generateAlert(message,exportOptions)).value
 
-if (exportToFiles) { 
-  await DocumentPicker.exportImage(imgCrop) 
-} else { 
-  Photos.save(imgCrop) 
+if (exportValue == exports.photos) {
+  Photos.save(img)
+} else if (exportValue == exports.files) {
+  await DocumentPicker.exportImage(img)
 }
 
 Script.complete()
@@ -147,29 +130,24 @@ Script.complete()
 // Generate an alert with the provided array of options.
 async function generateAlert(message,options) {
   
-  let alert = new Alert()
+  const alert = new Alert()
   alert.message = message
   
+  const isObject = options[0].value
   for (const option of options) {
-    alert.addAction(option)
+  	alert.addAction(isObject ? option.value : option)
   }
   
-  let response = await alert.presentAlert()
-  return response
+  const index = await alert.presentAlert()
+  return { 
+  	index: index, 
+  	value: isObject ? options[index].value : options[index],
+  	key: isObject ? options[index].key : options[index]
+  }
 }
 
-// Crop an image into the specified rect.
-function cropImage(image) {
-   
-  let draw = new DrawContext()
-  let rect = new Rect(crop.x,crop.y,crop.w,crop.h)
-  draw.size = new Size(rect.width, rect.height)
-  
-  draw.drawImageAtPoint(image,new Point(-rect.x, -rect.y))  
-  return draw.getImage()
-}
-
-async function blurImage(img,imgCrop,style) {
+// Blur an image using the optional specified style.
+async function blurImage(img,style) {
   const js = `
   /*
 
@@ -562,6 +540,10 @@ async function blurImage(img,imgCrop,style) {
     return [hsl[0],s,hsl[2]];
     
   }
+  
+  // Capture variables from Scriptable.
+  const style = "${style}"
+  const blurRadius = ${blurRadius}
 
   // Set up the canvas.
   const img = document.getElementById("blurImg");
@@ -580,12 +562,11 @@ async function blurImage(img,imgCrop,style) {
   context.drawImage( img, 0, 0 );
   
   // Get the image data from the context.
-  var imageData = context.getImageData(0,0,w,h);
-  var pix = imageData.data;
+  const imageData = context.getImageData(0,0,w,h);
+  const pix = imageData.data;
   
   // Set the image function, if any.
-  var imageFunc;
-  var style = "${style}";
+  let imageFunc;
   if (style == "dark") { imageFunc = darkBlur; }
   else if (style == "light") { imageFunc = lightBlur; }
 
@@ -611,7 +592,7 @@ async function blurImage(img,imgCrop,style) {
   context.putImageData(imageData,0,0);
 
   // Blur the image.
-  stackBlurCanvasRGB("mainCanvas", 0, 0, w, h, ${blur});
+  stackBlurCanvasRGB("mainCanvas", 0, 0, w, h, blurRadius);
   
   // Perform the additional processing for dark images.
   if (style == "dark") {
@@ -642,165 +623,257 @@ async function blurImage(img,imgCrop,style) {
   `
   
   // Convert the images and create the HTML.
-  let blurImgData = Data.fromPNG(img).toBase64String()
-  let html = `
+  const blurImgData = Data.fromPNG(img).toBase64String()
+  const html = `
   <img id="blurImg" src="data:image/png;base64,${blurImgData}" />
   <canvas id="mainCanvas" />
   `
   
   // Make the web view and get its return value.
-  let view = new WebView()
+  const view = new WebView()
   await view.loadHTML(html)
-  let returnValue = await view.evaluateJavaScript(js)
+  const returnValue = await view.evaluateJavaScript(js)
   
   // Remove the data type from the string and convert to data.
-  let imageDataString = returnValue.slice(22)
-  let imageData = Data.fromBase64String(imageDataString)
+  const imageData = Data.fromBase64String(returnValue.slice(22))
   
-  // Convert to image and crop before returning.
-  let imageFromData = Image.fromData(imageData)
-  return cropImage(imageFromData)
+  // Convert to image and return.
+  return Image.fromData(imageData)
 }
 
-// Pixel sizes and positions for widgets on all supported phones.
-function phoneSizes() {
-  let phones = {  
+/*
+
+How phoneSizes() works
+======================
+This function takes the pixel height value of an iPhone screenshot and provides information about the sizes and locations of widgets on that iPhone. The "text" and "notext" properties refer to whether the home screen is set to Small (with text labels) or Large (no text labels).
+
+The remaining properties can be determined using a single screenshot of a home screen with 6 small widgets on it. You can see a visual representation of these properties by viewing this image: https://github.com/mzeryck/Widget-Blur/blob/main/measurements.png
+
+* The following properties define widget sizes:
+	- small: The height of a small widget.
+	- medium: From the left of the leftmost widget to the right of the rightmost widget.
+	- large: From the top of a widget in the top row to the bottom of a widget in the middle row.
+
+* The following properties measure the distance from the left edge of the screen: 
+	- left: The distance to the left edge of widgets in the left column.
+	- right: The distance to the left edge of widgets in the right column.
+	
+* The following properties measure the distance from the top edge of the screen: 
+	- top: The distance to the top edge of widgets in the top row.
+	- middle: The distance to the top edge of widgets in the middle row.
+	- bottom: The distance to the top edge of widgets in the bottom row.
+
+*/
+function phoneSizes(inputHeight) {
+  return { 
   
-    // 14 Pro Max
+    /*
+  
+    Supported devices
+    =================
+    The following device measurements have been confirmed in iOS 18.
+  
+    */
+  
+    // 16 Pro Max
+    "2868": {
+      text: {
+        small: 510,
+        medium: 1092,
+        large: 1146,
+        left: 114,
+        right: 696,
+        top: 276,
+        middle: 912,
+        bottom: 1548
+      },
+      notext: {
+        small: 530,
+        medium: 1138,
+        large: 1136,
+        left: 91,
+        right: 699,
+        top: 276,
+        middle: 882,
+        bottom: 1488
+      } 
+    },
+    
+    // 16 Plus, 15 Plus, 15 Pro Max, 14 Pro Max
     "2796": {
+      text: {
+        small: 510,
+        medium: 1092,
+        large: 1146,
+        left: 98,
+        right: 681,
+        top: 252,
+        middle: 888,
+        bottom: 1524
+      },
+      notext: {
+        small: 530,
+        medium: 1139,
+        large: 1136,
+        left: 75,
+        right: 684,
+        top: 252,
+        middle: 858,
+        bottom: 1464
+      }
+    },
+    
+    // 16 Pro
+    "2622": {
+      text: {
+        small: 486,
+        medium: 1032,
+        large: 1098,
+        left: 87,
+        right: 633,
+        top: 261,
+        middle: 872,
+        bottom: 1485
+      },
+      notext: {
+        small: 495,
+        medium: 1037,
+        large: 1035,
+        left: 84,
+        right: 626,
+        top: 270,
+        middle: 810,
+        bottom: 1350
+      } 
+    },
+
+    // 16, 15, 15 Pro, 14 Pro
+    "2556": {
+      text: {
+        small: 474,
+        medium: 1017,
+        large: 1062,
+        left: 81,
+        right: 624,
+        top: 240,
+        middle: 828,
+        bottom: 1416
+      },
+      notext: {
+        small: 495,
+        medium: 1047,
+        large: 1047,
+        left: 66,
+        right: 618,
+        top: 243,
+        middle: 795,
+        bottom: 1347
+      }
+    },
+  
+    // SE3, SE2
+    "1334": {
+      text: {
+        small: 296,
+        medium: 642,
+        large: 648,
+        left: 54,
+        right: 400,
+        top: 60,
+        middle: 412,
+        bottom: 764
+      },
+      notext: {
+        small: 309,
+        medium: 667,
+        large: 667,
+        left: 41,
+        right: 399,
+        top: 67,
+        middle: 425,
+        bottom: 783
+      }
+    },
+    
+    /*
+  
+    In-limbo devices
+    =================
+    The following device measurements were confirmed in older versions of iOS.
+    Please comment if you can confirm these for iOS 18.
+  
+    */
+     
+    // 14 Plus, 13 Pro Max, 12 Pro Max
+    "2778": {
       small: 510,
       medium: 1092,
       large: 1146,
-      left: 99,
-      right: 681,
-      top: 282,
-      middle: 918,
-      bottom: 1554
-    },
-
-    // 14 Pro
-    "2556": {
-      small: 474,
-      medium: 1014,
-      large: 1062,
-      left: 82,
-      right: 622,
-      top: 270,
-      middle: 858,
-      bottom: 1446
-    },
-   
-    // 13 Pro Max, 12 Pro Max
-    "2778": {
-      small:  510,
-      medium: 1092,
-      large:  1146,
-      left:  96,
+      left: 96,
       right: 678,
-      top:    246,
+      top: 246,
       middle: 882,
       bottom: 1518
     },
-  
-    // 13, 13 Pro, 12, 12 Pro
-    "2532": {
-      small:  474,
-      medium: 1014,
-      large:  1062,
-      left:  78,
-      right: 618,
-      top:    231,
-      middle: 819,
-      bottom: 1407
-    },
-  
+
     // 11 Pro Max, XS Max
     "2688": {
-      small:  507,
+      small: 507,
       medium: 1080,
-      large:  1137,
-      left:  81,
+      large: 1137,
+      left: 81,
       right: 654,
-      top:    228,
+      top: 228,
       middle: 858,
       bottom: 1488
     },
-  
-    // 11, XR
-    "1792": {
-      small:  338,
-      medium: 720,
-      large:  758,
-      left:  55,
-      right: 437,
-      top:    159,
-      middle: 579,
-      bottom: 999
+    
+    // 14, 13, 13 Pro, 12, 12 Pro
+    "2532": {
+      small: 474,
+      medium: 1014,
+      large: 1062,
+      left: 78,
+      right: 618,
+      top: 231,
+      middle: 819,
+      bottom: 1407
     },
-    
-    
+
     // 13 mini, 12 mini / 11 Pro, XS, X
     "2436": {
-     
       x: {
-        small:  465,
+        small: 465,
         medium: 987,
-        large:  1035,
-        left:  69,
+        large: 1035,
+        left: 69,
         right: 591,
-        top:    213,
+        top: 213,
         middle: 783,
-        bottom: 1353,
+        bottom: 1353
       },
-      
       mini: {
-        small:  465,
+        small: 465,
         medium: 987,
-        large:  1035,
-        left:  69,
+        large: 1035,
+        left: 69,
         right: 591,
-        top:    231,
+        top: 231,
         middle: 801,
-        bottom: 1371,
-      }
-      
-    },
-  
-    // Plus phones
-    "2208": {
-      small:  471,
-      medium: 1044,
-      large:  1071,
-      left:  99,
-      right: 672,
-      top:    114,
-      middle: 696,
-      bottom: 1278
+        bottom: 1371
+      } 
     },
     
-    // SE2 and 6/6S/7/8
-    "1334": {
-      small:  296,
-      medium: 642,
-      large:  648,
-      left:  54,
-      right: 400,
-      top:    60,
-      middle: 412,
-      bottom: 764
-    },
-    
-    
-    // SE1
-    "1136": {
-      small:  282,
-      medium: 584,
-      large:  622,
-      left: 30,
-      right: 332,
-      top:  59,
-      middle: 399,
-      bottom: 399
+    // 11, XR
+    "1792": {
+      small: 338,
+      medium: 720,
+      large: 758,
+      left: 55,
+      right: 437,
+      top: 159,
+      middle: 579,
+      bottom: 999
     },
     
     // 11 and XR in Display Zoom mode
@@ -815,7 +888,27 @@ function phoneSizes() {
       bottom: 902 
     },
     
-    // Plus in Display Zoom mode
+    /*
+  
+    Older devices
+    =================
+    The following devices cannot be updated to iOS 18 or later.
+  
+    */
+  
+    // Home button Plus phones
+    "2208": {
+      small: 471,
+      medium: 1044,
+      large: 1071,
+      left: 99,
+      right: 672,
+      top: 114,
+      middle: 696,
+      bottom: 1278
+    },
+    
+    // Home button Plus in Display Zoom mode
     "2001" : {
       small: 444,
       medium: 963,
@@ -826,6 +919,17 @@ function phoneSizes() {
       middle: 618,
       bottom: 1146
     },
-  }
-  return phones
+
+    // SE1
+    "1136": {
+      small: 282,
+      medium: 584,
+      large: 622,
+      left: 30,
+      right: 332,
+      top: 59,
+      middle: 399,
+      bottom: 399
+    }
+  }[inputHeight]
 }
