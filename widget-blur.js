@@ -135,14 +135,14 @@ async function generateAlert(message,options) {
   
   const isObject = options[0].value
   for (const option of options) {
-  	alert.addAction(isObject ? option.value : option)
+    alert.addAction(isObject ? option.value : option)
   }
   
   const index = await alert.presentAlert()
   return { 
-  	index: index, 
-  	value: isObject ? options[index].value : options[index],
-  	key: isObject ? options[index].key : options[index]
+    index: index, 
+    value: isObject ? options[index].value : options[index],
+    key: isObject ? options[index].key : options[index]
   }
 }
 
@@ -650,18 +650,18 @@ This function takes the pixel height value of an iPhone screenshot and provides 
 The remaining properties can be determined using a single screenshot of a home screen with 6 small widgets on it. You can see a visual representation of these properties by viewing this image: https://github.com/mzeryck/Widget-Blur/blob/main/measurements.png
 
 * The following properties define widget sizes:
-	- small: The height of a small widget.
-	- medium: From the left of the leftmost widget to the right of the rightmost widget.
-	- large: From the top of a widget in the top row to the bottom of a widget in the middle row.
+  - small: The height of a small widget.
+  - medium: From the left of the leftmost widget to the right of the rightmost widget.
+  - large: From the top of a widget in the top row to the bottom of a widget in the middle row.
 
 * The following properties measure the distance from the left edge of the screen: 
-	- left: The distance to the left edge of widgets in the left column.
-	- right: The distance to the left edge of widgets in the right column.
-	
+  - left: The distance to the left edge of widgets in the left column.
+  - right: The distance to the left edge of widgets in the right column.
+  
 * The following properties measure the distance from the top edge of the screen: 
-	- top: The distance to the top edge of widgets in the top row.
-	- middle: The distance to the top edge of widgets in the middle row.
-	- bottom: The distance to the top edge of widgets in the bottom row.
+  - top: The distance to the top edge of widgets in the top row.
+  - middle: The distance to the top edge of widgets in the middle row.
+  - bottom: The distance to the top edge of widgets in the bottom row.
 
 */
 function phoneSizes(inputHeight) {
@@ -770,6 +770,43 @@ function phoneSizes(inputHeight) {
         bottom: 1347
       }
     },
+    
+    // 13 mini, 12 mini / 11 Pro, XS, X
+    // Note that only the mini has been confirmed for iOS 18
+    "2436": {
+      x: {
+        small: 465,
+        medium: 987,
+        large: 1035,
+        left: 69,
+        right: 591,
+        top: 213,
+        middle: 783,
+        bottom: 1353
+      },
+      mini: {
+        small: 465,
+        medium: 987,
+        large: 1035,
+        left: 69,
+        right: 591,
+        top: 231,
+        middle: 801,
+        bottom: 1371
+      } 
+    },
+    
+    // 13 mini, 12 mini in Display Zoom mode
+    "2079": {
+      small: 423,
+      medium: 875,
+      large: 933,
+      left: 42,
+      right: 494,
+      top: 186,
+      middle: 696,
+      bottom: 1206
+    },
   
     // SE3, SE2
     "1334": {
@@ -838,30 +875,6 @@ function phoneSizes(inputHeight) {
       top: 231,
       middle: 819,
       bottom: 1407
-    },
-
-    // 13 mini, 12 mini / 11 Pro, XS, X
-    "2436": {
-      x: {
-        small: 465,
-        medium: 987,
-        large: 1035,
-        left: 69,
-        right: 591,
-        top: 213,
-        middle: 783,
-        bottom: 1353
-      },
-      mini: {
-        small: 465,
-        medium: 987,
-        large: 1035,
-        left: 69,
-        right: 591,
-        top: 231,
-        middle: 801,
-        bottom: 1371
-      } 
     },
     
     // 11, XR
